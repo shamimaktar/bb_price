@@ -14,6 +14,7 @@ import re
 import smtplib
 import ssl
 import time
+
 from dataclasses import dataclass
 from email.message import EmailMessage
 from pathlib import Path
@@ -39,6 +40,10 @@ def _parse_non_negative_int(raw_value: str | None, default: int = 0) -> int:
     except ValueError:
         return default
     return parsed if parsed >= 0 else default
+
+
+class FetchPageError(Exception):
+    """Raised when product page cannot be fetched after retries."""
 
 
 @dataclass
@@ -81,7 +86,7 @@ class Config:
         )
 
 
-def fetch_product_page(product_url: str) -> str:
+def fetch_product_page(product_url: str, retries: int = 3, timeout_seconds: int = 30) -> str:
     import requests
 
     headers = {
@@ -91,9 +96,26 @@ def fetch_product_page(product_url: str) -> str:
         "Cache-Control": "no-cache",
         "Pragma": "no-cache",
     }
-    response = requests.get(product_url, headers=headers, timeout=30)
-    response.raise_for_status()
-    return response.text
+
+    attempts = max(retries, 1)
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            response = requests.get(product_url, headers=headers, timeout=(10, timeout_seconds))
+            response.raise_for_status()
+            return response.text
+        except requests.exceptions.RequestException as error:
+            last_error = error
+            if attempt >= attempts:
+                break
+            backoff_seconds = min(2 * attempt, 10)
+            print(
+                f"Fetch attempt {attempt} failed ({error.__class__.__name__}). "
+                f"Retrying in {backoff_seconds}s..."
+            )
+            time.sleep(backoff_seconds)
+
+    raise FetchPageError(str(last_error))
 
 
 def _scan_for_open_box_signal(node: Any) -> bool:
@@ -212,7 +234,11 @@ def should_notify(now_available: bool, state: dict, reminder_minutes: int) -> bo
 
 def main() -> None:
     config = Config.from_env()
-    html = fetch_product_page(config.product_url)
+    try:
+        html = fetch_product_page(config.product_url)
+    except FetchPageError as error:
+        print(f"Network error while fetching product page: {error}. Skipping this run.")
+        return
     now_available = has_open_box_stock(html)
     state = read_state(config.state_file)
 

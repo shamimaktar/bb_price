@@ -1,5 +1,6 @@
 import unittest
 
+
 from scripts.check_open_box import _extract_next_data_json, _parse_non_negative_int, has_open_box_stock
 
 
@@ -30,6 +31,8 @@ class OpenBoxDetectionTests(unittest.TestCase):
 
     def test_parse_non_negative_int_handles_valid(self):
         self.assertEqual(_parse_non_negative_int("15"), 15)
+
+
 
     def test_extract_next_data_json(self):
         html = '<script id="__NEXT_DATA__" type="application/json">{"foo":1}</script>'

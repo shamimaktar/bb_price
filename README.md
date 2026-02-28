@@ -50,3 +50,8 @@ The workflow already defaults to your provided URL and SKU.
 
 ## Speed limits
 GitHub Actions cannot run faster than every 5 minutes. For 30–60 second checks, run this script on an always-on server.
+
+
+## Network/transient error handling
+- The checker retries Best Buy fetches automatically on transient request failures/timeouts.
+- If fetch still fails after retries, the run exits gracefully (no crash) and tries again on next schedule.
