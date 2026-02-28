@@ -30,6 +30,16 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 
+def _parse_non_negative_int(raw_value: str | None, default: int = 0) -> int:
+    value = (raw_value or "").strip()
+    if not value:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError:
+        return default
+    return parsed if parsed >= 0 else default
+
 
 @dataclass
 class Config:
@@ -57,7 +67,7 @@ class Config:
 
         notify_from = os.getenv("NOTIFY_FROM_EMAIL", required["GMAIL_SMTP_USER"]).strip()
         state_file = Path(os.getenv("STATE_FILE", ".state/open_box_state.json")).resolve()
-        reminder_minutes = int(os.getenv("REMINDER_MINUTES", "0"))
+        reminder_minutes = _parse_non_negative_int(os.getenv("REMINDER_MINUTES"), default=0)
 
         return cls(
             product_url=product_url,
