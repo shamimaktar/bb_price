@@ -46,8 +46,9 @@ OPENBOX_URL = (
     "JJGGLHC84R/sku/{sku}/openbox?condition={condition}"
 )
 
-# Rotate TLS profiles across runs to vary the fingerprint
-IMPERSONATE_PROFILES = ["chrome131", "chrome130", "chrome124", "chrome120"]
+# FIX: Use profiles that curl_cffi 0.14 actually ships with.
+# "chrome" (no version) always maps to the library's latest built-in profile.
+IMPERSONATE_PROFILES = ["chrome", "chrome124", "chrome120", "chrome116"]
 
 
 # ─── Helpers ─────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ def _get_headers(accept: str = "text/html", referer: str = "") -> dict:
         "Accept": accept,
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
-        "sec-ch-ua": '"Chromium";v="131", "Google Chrome";v="131", "Not_A Brand";v="24"',
+        "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not_A Brand";v="24"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
         "sec-fetch-dest": "document",
@@ -100,7 +101,7 @@ class FetchError(Exception):
 
 
 def _fetch(url: str, profile: str, headers: dict, timeout: int = 20) -> str:
-    """Fetch URL with curl_cffi. Raises FetchError on failure."""
+    """Fetch URL with curl_cffi. Auto-retries with 'chrome' if profile unsupported."""
     try:
         r = curl_requests.get(
             url, headers=headers, impersonate=profile,
@@ -112,6 +113,11 @@ def _fetch(url: str, profile: str, headers: dict, timeout: int = 20) -> str:
     except FetchError:
         raise
     except Exception as e:
+        err_msg = str(e).lower()
+        # If the chosen profile isn't bundled, fall back to generic "chrome"
+        if "not supported" in err_msg and profile != "chrome":
+            print(f"  Profile '{profile}' unsupported, retrying with 'chrome'")
+            return _fetch(url, "chrome", headers, timeout)
         raise FetchError(str(e))
 
 
@@ -462,4 +468,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-            
+        
